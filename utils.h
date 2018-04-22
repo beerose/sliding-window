@@ -50,4 +50,4 @@ ReceivedData receive_message(ProgramParams *params);
 ReceivedData extract_data(char *buf);
 std::vector<std::string> split(std::string str, char delimiter);
 void save(const std::vector<std::string> *data, const char *filename);
-void move_sliding_window(std::vector<int> *window);
+int move_sliding_window(std::vector<std::string> *window, int ack);

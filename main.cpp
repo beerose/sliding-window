@@ -23,7 +23,7 @@ while (true <- all received or !timeout)
 */
 
 int main(int argc, char *argv[]) {
-  int size, segments, bytes_left, port;
+  int size, segments, bytes_left, port, last_segment_size;
   const char *filename;
   ProgramParams params;
 
@@ -39,22 +39,23 @@ int main(int argc, char *argv[]) {
 
   bytes_left = size;
   segments = ceil((float)size / (float)BYTES_IN_SEGMENT);
+  last_segment_size = size % BYTES_IN_SEGMENT;
 
   std::vector<std::string> data(segments, "");
   int last_ack = 0;
 
   while (bytes_left > 0) {
-    for (int i = last_ack; i < last_ack + WINDOW_SIZE; i++) {
-      int start = i * BYTES_IN_SEGMENT;
-      int amount =
-          ((i + 1 == segments) ? bytes_left : BYTES_IN_SEGMENT); // it works
-      std::string message = get_message_to_send(start, amount);
+    for (int i = last_ack; i < last_ack + WINDOW_SIZE && (data[i] == ""); i++) {
       if (data[i] == "") {
+        int start = i * BYTES_IN_SEGMENT;
+        int amount = ((i + 1 == segments) ? last_segment_size
+                                          : BYTES_IN_SEGMENT); // it works
+        std::string message = get_message_to_send(start, amount);
         send_message(&params, message);
       }
     }
 
-    for (int i = last_ack; i < last_ack + WINDOW_SIZE; i++) {
+    for (int j = last_ack; j < last_ack + WINDOW_SIZE; j++) {
       auto received_data = receive_message(&params);
       int index = received_data.start / BYTES_IN_SEGMENT;
       if (index >= last_ack && data[index] == "") {
@@ -63,9 +64,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    if (data[last_ack] != "") {
-      last_ack++;
-    }
+    last_ack = move_sliding_window(&data, last_ack);
   }
   std::cout << "Done! \n";
   save(&data, filename);

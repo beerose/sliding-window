@@ -122,8 +122,15 @@ void save(const std::vector<std::string> *data, const char *filename) {
   file.close();
 }
 
-void move_sliding_window(std::vector<int> *window) {
-  for (int i = 0; i < window->size(); i++) {
-    (*window)[i]++;
+int move_sliding_window(std::vector<std::string> *data, int ack) {
+  int i;
+  if ((*data)[ack] == "") {
+    return ack;
   }
+  for (i = 0; i < 4; i++) {
+    if ((*data)[ack + i] == "") {
+      return ack + i;
+    }
+  }
+  return ack + i;
 }

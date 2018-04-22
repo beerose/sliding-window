@@ -1,6 +1,26 @@
 #include "utils.h"
 
 int BYTES_IN_SEGMENT = 700;
+int WINDOW_SIZE = 3;
+
+/*
+selective repeat
+
+Some pseudocode:
+while (true <- all received or !timeout)
+  for last_ack to last_act + WINDOW_SIZE {
+    if !data[i] sent_message
+  }
+
+  if received > last_ack && received <= last_ack + WINODW_SIZE {
+    data[received] = received.data
+  }
+
+  if received == last_ack+1 {
+    last_ack ++
+  }
+
+*/
 
 int main(int argc, char *argv[]) {
   int size, segments, bytes_left, port;
@@ -21,26 +41,34 @@ int main(int argc, char *argv[]) {
   segments = ceil((float)size / (float)BYTES_IN_SEGMENT);
 
   std::vector<std::string> data(segments, "");
-  for (int i = 0; i < segments; i++) {
+  int last_ack = 0;
 
-    int start = i * BYTES_IN_SEGMENT;
-    int amount =
-        ((i + 1 == segments) ? bytes_left : BYTES_IN_SEGMENT); // it works
-    std::string message = get_message_to_send(start, amount);
+  while (bytes_left > 0) {
+    for (int i = last_ack; i < last_ack + WINDOW_SIZE; i++) {
+      int start = i * BYTES_IN_SEGMENT;
+      int amount =
+          ((i + 1 == segments) ? bytes_left : BYTES_IN_SEGMENT); // it works
+      std::string message = get_message_to_send(start, amount);
+      if (data[i] == "") {
+        send_message(&params, message);
+      }
+    }
 
-    while (data[i] == "") {
-      std::cout << "Sending: " << message;
-      send_message(params, message);
-
-      auto received_data = receive_message(params);
-      if (received_data.start == start && received_data.amount == amount) {
-        data[i] = received_data.data;
+    for (int i = last_ack; i < last_ack + WINDOW_SIZE; i++) {
+      auto received_data = receive_message(&params);
+      int index = received_data.start / BYTES_IN_SEGMENT;
+      if (index >= last_ack && data[index] == "") {
+        data[index] = received_data.data;
         bytes_left -= BYTES_IN_SEGMENT;
       }
     }
+
+    if (data[last_ack] != "") {
+      last_ack++;
+    }
   }
   std::cout << "Done! \n";
-  save(data, filename);
+  save(&data, filename);
 
   return 1;
 }

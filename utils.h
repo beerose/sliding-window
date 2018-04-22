@@ -45,8 +45,9 @@ typedef struct {
 int validate_args(int argc, char *argv[]);
 ProgramParams initialise_socket(int port);
 std::string get_message_to_send(int start, int end);
-void send_message(ProgramParams params, std::string message);
-ReceivedData receive_message(ProgramParams params);
+void send_message(ProgramParams *params, std::string message);
+ReceivedData receive_message(ProgramParams *params);
 ReceivedData extract_data(char *buf);
 std::vector<std::string> split(std::string str, char delimiter);
-void save(std::vector<std::string> data, const char *filename);
+void save(const std::vector<std::string> *data, const char *filename);
+void move_sliding_window(std::vector<int> *window);

@@ -36,11 +36,11 @@ std::string get_message_to_send(int start, int end) {
   return "GET " + std::to_string(start) + " " + std::to_string(end) + "\n";
 }
 
-void send_message(ProgramParams info, std::string message) {
+void send_message(ProgramParams *info, std::string message) {
   int numbytes;
   if ((numbytes =
-           sendto(info.sockfd, message.c_str(), strlen(message.c_str()), 0,
-                  (struct sockaddr *)&info.addr, sizeof(info.addr))) == -1) {
+           sendto(info->sockfd, message.c_str(), strlen(message.c_str()), 0,
+                  (struct sockaddr *)&info->addr, sizeof(info->addr))) == -1) {
     perror("sendto");
     return;
   }
@@ -49,16 +49,16 @@ void send_message(ProgramParams info, std::string message) {
   return;
 }
 
-ReceivedData receive_message(ProgramParams params) {
+ReceivedData receive_message(ProgramParams *params) {
   ReceivedData received;
   int numbytes;
   char buf[MAXBUFLEN];
 
   fd_set descriptors;
   FD_ZERO(&descriptors);
-  FD_SET(params.sockfd, &descriptors);
+  FD_SET(params->sockfd, &descriptors);
   struct timeval tv = {1, 0};
-  int ready = select(params.sockfd + 1, &descriptors, NULL, NULL, &tv);
+  int ready = select(params->sockfd + 1, &descriptors, NULL, NULL, &tv);
 
   if (ready < 0) {
     std::cerr << "Read from socket error.";
@@ -68,14 +68,14 @@ ReceivedData receive_message(ProgramParams params) {
     struct sockaddr_storage their_addr;
     socklen_t addr_len = sizeof their_addr;
 
-    if ((numbytes = recvfrom(params.sockfd, buf, MAXBUFLEN - 1, MSG_DONTWAIT,
+    if ((numbytes = recvfrom(params->sockfd, buf, MAXBUFLEN - 1, MSG_DONTWAIT,
                              (struct sockaddr *)&their_addr, &addr_len)) ==
         -1) {
       perror("recvfrom");
       return received;
     }
 
-    std::cout << "packet contains: " << buf << "\n";
+    // std::cout << "packet contains: " << buf << "\n";
     received = extract_data(buf);
   }
 
@@ -112,12 +112,18 @@ std::vector<std::string> split(std::string str, char delimiter) {
   return internal;
 }
 
-void save(std::vector<std::string> data, const char *filename) {
+void save(const std::vector<std::string> *data, const char *filename) {
   std::fstream file(filename, std::ios::out | std::ios::app);
 
-  for (int i = 0; i < data.size(); i++) {
-    file << data[i];
+  for (int i = 0; i < (*data).size(); i++) {
+    file << (*data)[i];
   }
 
   file.close();
+}
+
+void move_sliding_window(std::vector<int> *window) {
+  for (int i = 0; i < window->size(); i++) {
+    (*window)[i]++;
+  }
 }

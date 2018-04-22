@@ -1,7 +1,7 @@
 #include "utils.h"
 
 int BYTES_IN_SEGMENT = 700;
-int WINDOW_SIZE = 3;
+int WINDOW_SIZE = 4;
 
 /*
 selective repeat

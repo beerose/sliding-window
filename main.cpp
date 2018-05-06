@@ -15,6 +15,8 @@ int main(int argc, char *argv[]) {
   filename = argv[2];
   size = std::stoi(argv[3]);
 
+  std::fstream file(filename, std::ios::out | std::ios::app | std::ios::binary);
+
   params = initialise_socket(port);
 
   bytes_left = size;
@@ -35,12 +37,13 @@ int main(int argc, char *argv[]) {
       auto received_data = receive_message(params);
       if (received_data.start == start && received_data.amount == amount) {
         data[i] = received_data.data;
+        file << received_data.data;
         bytes_left -= BYTES_IN_SEGMENT;
       }
     }
   }
   std::cout << "Done! \n";
-  save(data, filename);
-
+  // save(data, filename);
+  file.close();
   return 1;
 }

@@ -84,19 +84,21 @@ ReceivedData receive_message(ProgramParams params) {
 
 ReceivedData extract_data(char *buf) {
   ReceivedData data = {"", -1, -1};
-  std::vector<std::string> lines = split(buf, '\n');
-  std::vector<std::string> magic_info = split(lines[0], ' ');
+  std::string str(buf, 700);
 
-  if (lines.size() < 2 || magic_info.size() != 3) {
-    std::cerr << "invalid data received" << std::endl;
+  size_t found = str.find("\n");
+  std::string magic_info = str.substr(0, found);
+
+  std::vector<std::string> info = split(magic_info, ' ');
+  if (info.size() < 3) {
+    std::cerr << "Invalid data received. \n";
     return data;
   }
-  data.start = std::stoi(magic_info[1]);
-  data.amount = std::stoi(magic_info[2]);
+  data.start = stoi(info[1]);
+  data.amount = stoi(info[2]);
 
-  for (int i = 1; i < lines.size(); i++) {
-    data.data += lines[i];
-  }
+  data.data = str.substr(found);
+
   return data;
 }
 
@@ -113,7 +115,7 @@ std::vector<std::string> split(std::string str, char delimiter) {
 }
 
 void save(std::vector<std::string> data, const char *filename) {
-  std::fstream file(filename, std::ios::out | std::ios::app);
+  std::fstream file(filename, std::ios::out | std::ios::app | std::ios::binary);
 
   for (int i = 0; i < data.size(); i++) {
     file << data[i];

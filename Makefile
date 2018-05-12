@@ -8,11 +8,11 @@ OBJ = utils.o main.o
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-udp-client: $(OBJ)
+transport: $(OBJ)
 	gcc -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 clean:
 	rm $(OBJ)
 
 distclean:
-	rm udp-client $(OBJ)
+	rm transport $(OBJ)

@@ -5,6 +5,22 @@ int validate_args(int argc, char *argv[]) {
   return (argc == 4 && argv != nullptr && (port >= 0 && port <= 65535));
 }
 
+void print_progress(int size, int left) {
+  std::cout << "Done " << ((double)(size - left) / (double)size) * 100
+            << "% \n";
+}
+
+int select(int sockfd, int tv_usec) {
+  fd_set descriptors;
+  FD_ZERO(&descriptors);
+  FD_SET(sockfd, &descriptors);
+  struct timeval tv;
+  tv.tv_usec = tv_usec;
+  tv.tv_sec = 0;
+
+  return select(sockfd + 1, &descriptors, NULL, NULL, &tv);
+}
+
 ProgramParams initialise_socket(int port) {
   struct sockaddr_in server_address;
   ProgramParams params = {-1};
@@ -17,7 +33,6 @@ ProgramParams initialise_socket(int port) {
   server_address.sin_family = AF_INET;
   server_address.sin_port = htons(port);
 
-  std::cout << "port: " << server_address.sin_port << " mine" << port;
   inet_pton(AF_INET, SERVER_IP_ADDRESS, &server_address.sin_addr);
 
   int isConnected = connect(sockfd, (struct sockaddr *)&server_address,
@@ -32,12 +47,14 @@ ProgramParams initialise_socket(int port) {
   return params;
 }
 
-std::string get_message_to_send(int start, int end) {
-  return "GET " + std::to_string(start) + " " + std::to_string(end) + "\n";
+std::string get_message_to_send(int start, int amount) {
+  return "GET " + std::to_string(start) + " " + std::to_string(amount) + "\n";
 }
 
-void send_message(ProgramParams *info, std::string message) {
+void send_message(ProgramParams *info, int start, int amount) {
   int numbytes;
+
+  std::string message = get_message_to_send(start, amount);
   if ((numbytes =
            sendto(info->sockfd, message.c_str(), strlen(message.c_str()), 0,
                   (struct sockaddr *)&info->addr, sizeof(info->addr))) == -1) {
@@ -45,7 +62,6 @@ void send_message(ProgramParams *info, std::string message) {
     return;
   }
 
-  std::cout << "sent " << message << "to: " << SERVER_IP_ADDRESS << "\n\n";
   return;
 }
 
@@ -54,49 +70,39 @@ ReceivedData receive_message(ProgramParams *params) {
   int numbytes;
   char buf[MAXBUFLEN];
 
-  fd_set descriptors;
-  FD_ZERO(&descriptors);
-  FD_SET(params->sockfd, &descriptors);
-  struct timeval tv = {1, 0};
-  int ready = select(params->sockfd + 1, &descriptors, NULL, NULL, &tv);
+  struct sockaddr_storage their_addr;
+  socklen_t addr_len = sizeof their_addr;
 
-  if (ready < 0) {
-    std::cerr << "Read from socket error.";
-  } else if (ready == 0) {
-    std::cout << "End of time.";
-  } else {
-    struct sockaddr_storage their_addr;
-    socklen_t addr_len = sizeof their_addr;
-
-    if ((numbytes = recvfrom(params->sockfd, buf, MAXBUFLEN - 1, MSG_DONTWAIT,
-                             (struct sockaddr *)&their_addr, &addr_len)) ==
-        -1) {
-      perror("recvfrom");
-      return received;
-    }
-
-    // std::cout << "packet contains: " << buf << "\n";
-    received = extract_data(buf);
+  if ((numbytes = recvfrom(params->sockfd, buf, MAXBUFLEN - 1, MSG_DONTWAIT,
+                           (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+    perror("recvfrom");
+    return received;
   }
+
+  received = extract_data(buf, numbytes);
+  // std::cout << "Received data: " << received.start << "amount: " <<
+  // received.amount << "\n";
 
   return received;
 }
 
-ReceivedData extract_data(char *buf) {
+ReceivedData extract_data(char *buf, int buf_size) {
   ReceivedData data = {"", -1, -1};
-  std::vector<std::string> lines = split(buf, '\n');
-  std::vector<std::string> magic_info = split(lines[0], ' ');
+  std::string str(buf, buf_size);
 
-  if (lines.size() < 2 || magic_info.size() != 3) {
-    std::cerr << "invalid data received" << std::endl;
+  size_t found = str.find('\n');
+  std::string magic_info = str.substr(0, found);
+
+  std::vector<std::string> info = split(magic_info, ' ');
+  if (info.size() < 3) {
+    std::cerr << "Invalid data received. \n";
     return data;
   }
-  data.start = std::stoi(magic_info[1]);
-  data.amount = std::stoi(magic_info[2]);
+  data.start = stoi(info[1]);
+  data.amount = stoi(info[2]);
 
-  for (int i = 1; i < lines.size(); i++) {
-    data.data += lines[i];
-  }
+  data.data = str.substr(found + 1);
+
   return data;
 }
 
@@ -113,7 +119,7 @@ std::vector<std::string> split(std::string str, char delimiter) {
 }
 
 void save(const std::vector<std::string> *data, const char *filename) {
-  std::fstream file(filename, std::ios::out | std::ios::app);
+  std::fstream file(filename, std::ios::out | std::ios::binary);
 
   for (int i = 0; i < (*data).size(); i++) {
     file << (*data)[i];
@@ -122,13 +128,14 @@ void save(const std::vector<std::string> *data, const char *filename) {
   file.close();
 }
 
-int move_sliding_window(std::vector<std::string> *data, int ack) {
+int move_sliding_window(std::vector<int> acknowledged, int ack,
+                        int window_size) {
   int i;
-  if ((*data)[ack] == "") {
+  if (acknowledged[ack] == -1) {
     return ack;
   }
-  for (i = 0; i < 4; i++) {
-    if ((*data)[ack + i] == "") {
+  for (i = 0; i < window_size; i++) {
+    if (acknowledged[ack + i] == -1) {
       return ack + i;
     }
   }

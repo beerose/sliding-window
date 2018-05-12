@@ -30,6 +30,8 @@
 #define WHITESPACE_CHAR 32
 #define NEWLINE_CHAR 13
 
+void print_progress(int size, int left);
+
 typedef struct {
   int sockfd;
   sockaddr_in addr;
@@ -44,10 +46,12 @@ typedef struct {
 
 int validate_args(int argc, char *argv[]);
 ProgramParams initialise_socket(int port);
-std::string get_message_to_send(int start, int end);
-void send_message(ProgramParams *params, std::string message);
+std::string get_message_to_send(int start, int amount);
+void send_message(ProgramParams *params, int start, int amount);
 ReceivedData receive_message(ProgramParams *params);
-ReceivedData extract_data(char *buf);
+ReceivedData extract_data(char *buf, int buf_size);
 std::vector<std::string> split(std::string str, char delimiter);
 void save(const std::vector<std::string> *data, const char *filename);
-int move_sliding_window(std::vector<std::string> *window, int ack);
+int move_sliding_window(std::vector<int> acknowledged, int ack,
+                        int window_size);
+int select(int sockfd, int tv_usec);
